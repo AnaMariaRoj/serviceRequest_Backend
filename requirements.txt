@@ -1,0 +1,7 @@
+fhir.resources
+pymongo
+fastapi
+uvicorn
+sqlalchemy
+pydantic
+gunicorn
