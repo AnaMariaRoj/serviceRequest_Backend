@@ -8,27 +8,45 @@ def connect_to_mongodb(uri, db_name, collection_name):
     collection = db[collection_name]
     return collection
 
-# Función para buscar solicitudes de servicio por identifier de paciente
+# Función para buscar solicitudes de servicio por identifier (FHIR: subject.identifier.value)
 def find_service_request_by_identifier(collection, identifier_value):
     try:
-        query = {"subject.identifier.value": identifier_value}
+        query = {
+            "subject.identifier.value": identifier_value
+        }
         service_request = collection.find_one(query)
         return service_request
     except Exception as e:
         print(f"Error al buscar en MongoDB: {e}")
         return None
 
-# Función para mostrar los datos de una solicitud de servicio
+# Función para mostrar los datos de una solicitud de servicio con estructura HL7 FHIR
 def display_service_request(service_request):
     if service_request:
         print("Solicitud de servicio encontrada:")
-        print(f"  ID: {service_request.get('_id')}")
+        print(f"  ID: {service_request.get('id', 'Sin ID')}")
         print(f"  Estado: {service_request.get('status', 'Desconocido')}")
         print(f"  Intención: {service_request.get('intent', 'Desconocida')}")
-        print(f"  Tipo de servicio: {service_request.get('code', {}).get('text', 'Desconocido')}")
-        print(f"  Fecha: {service_request.get('authoredOn', 'Desconocida')}")
-        print(f"  Solicitado por: {service_request.get('requester', {}).get('display', 'Desconocido')}")
-        print(f"  Paciente: {service_request.get('subject', {}).get('display', 'Desconocido')}")
+
+        # Mostrar codificación del código del servicio
+        code = service_request.get('code', {})
+        coding_list = code.get('coding', [])
+        if coding_list:
+            for coding in coding_list:
+                print(f"  Servicio - Sistema: {coding.get('system', '')}")
+                print(f"             Código: {coding.get('code', '')}")
+                print(f"             Nombre: {coding.get('display', '')}")
+        else:
+            print("  Tipo de servicio: No especificado")
+
+        print(f"  Fecha de solicitud: {service_request.get('authoredOn', 'Desconocida')}")
+
+        requester = service_request.get('requester', {})
+        print(f"  Solicitado por: {requester.get('display', 'Desconocido')}")
+
+        subject = service_request.get('subject', {})
+        print(f"  Paciente: {subject.get('display', 'Desconocido')}")
+
     else:
         print("No se encontró ninguna solicitud con el identifier especificado.")
 
