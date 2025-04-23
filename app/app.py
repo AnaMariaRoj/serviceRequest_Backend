@@ -1,4 +1,17 @@
+from fastapi import FastAPI, HTTPException, Request
+import uvicorn
 from app.controlador.ServiceRequestCrud import GetServiceRequestById, GetServiceRequestByIdentifier, WriteServiceRequest
+from fastapi.middleware.cors import CORSMiddleware
+
+app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Permitir solicitudes desde cualquier origen
+    allow_credentials=True,
+    allow_methods=["*"],  # Permitir todos los métodos (GET, POST, etc.)
+    allow_headers=["*"],  # Permitir todos los encabezados
+)
 
 @app.get("/servicerequest/{sr_id}", response_model=dict)
 async def get_service_request_by_id(sr_id: str):
