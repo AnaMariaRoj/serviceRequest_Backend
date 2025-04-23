@@ -2,7 +2,8 @@ from pymongo import MongoClient
 from pymongo.server_api import ServerApi
 
 # Función para conectar a la base de datos MongoDB
-def connect_to_mongodb(uri, db_name, collection_name):
+def connect_to_mongodb(db_name, collection_name):
+    uri = "mongodb+srv://mardugo:clave@sampleinformationservic.t2yog.mongodb.net/?retryWrites=true&w=majority&appName=SampleInformationService"
     client = MongoClient(uri, server_api=ServerApi('1'))
     db = client[db_name]
     collection = db[collection_name]
@@ -35,31 +36,5 @@ def display_service_request(service_request):
             for coding in coding_list:
                 print(f"  Servicio - Sistema: {coding.get('system', '')}")
                 print(f"             Código: {coding.get('code', '')}")
-                print(f"             Nombre: {coding.get('display', '')}")
-        else:
-            print("  Tipo de servicio: No especificado")
-
-        print(f"  Fecha de solicitud: {service_request.get('authoredOn', 'Desconocida')}")
-
-        requester = service_request.get('requester', {})
-        print(f"  Solicitado por: {requester.get('display', 'Desconocido')}")
-
-        subject = service_request.get('subject', {})
-        print(f"  Paciente: {subject.get('display', 'Desconocido')}")
-
-    else:
-        print("No se encontró ninguna solicitud con el identifier especificado.")
-
-# Ejemplo de uso
-if __name__ == "__main__":
-    uri = "mongodb+srv://mardugo:clave@sampleinformationservic.t2yog.mongodb.net/?retryWrites=true&w=majority&appName=SampleInformationService"
-    db_name = "HIS"
-    collection_name = "serviceRequest"
-
-    collection = connect_to_mongodb(uri, db_name, collection_name)
-    
-    identifier_value = "1020713756"
-    
-    service_request = find_service_request_by_identifier(collection, identifier_value)
-    
-    display_service_request(service_request)
+                print(f"             Nombre: {coding.get
+::contentReference[oaicite:0]{index=0}

@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException, Request
 import uvicorn
-from app.controlador.ServiceRequestCrud import GetServiceRequestById, GetServiceRequestByIdentifier, WriteServiceRequest
+from ServiceRequestCrud import GetServiceRequestById, GetServiceRequestByIdentifier, WriteServiceRequest
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
