@@ -41,9 +41,9 @@ async def get_service_request_by_identifier(system: str, value: str):
         raise HTTPException(status_code=500, detail=f"Internal error fetching ServiceRequest by identifier: {status}")
 
 # Ruta para agregar un nuevo ServiceRequest (POST)
-@app.post("/serviceRequest", response_model=dict)
+@app.post("/servicerequest", response_model=dict)
 async def add_service_request(request: Request):
-    print("DEBUG: POST /serviceRequest recibido.") # Debug
+    print("DEBUG: POST /servicerequest recibido.") # Debug
     try:
         # Obtenemos el cuerpo de la solicitud como un diccionario JSON
         new_sr_dict = dict(await request.json())
