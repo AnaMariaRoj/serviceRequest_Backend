@@ -1,7 +1,12 @@
 from fastapi import FastAPI, HTTPException, Request
 import uvicorn
 # Importamos las funciones CRUD específicas para ServiceRequest
-from app.controlador.ServiceRequestCrud import GetServiceRequestById, GetServiceRequestByIdentifier, WriteServiceRequest
+from app.controlador.ServiceRequestCrud import (
+    GetServiceRequestById,
+    GetServiceRequestByIdentifier,
+    WriteServiceRequest,
+    GetAllServiceRequests
+)
 from fastapi.middleware.cors import CORSMiddleware
 import json # Importar json para depuración si es necesario
 
@@ -72,6 +77,15 @@ async def add_service_request(request: Request):
 # Bloque para ejecutar la aplicación con Uvicorn si se ejecuta directamente este archivo
 # En un entorno de producción (como Render), esto es gestionado por el servidor de aplicaciones
 # (Gunicorn, por ejemplo), por lo que normalmente estaría comentado o ajustado.
+# Ruta para obtener todos los ServiceRequest
+@app.get("/servicerequest/all", response_model=dict)
+async def get_all_service_requests():
+    print("DEBUG: GET /servicerequest/all recibido.")  # Debug
+    status, sr_list = GetAllServiceRequests()
+    if status == 'success':
+        return {"serviceRequests": sr_list}
+    else:
+        raise HTTPException(status_code=500, detail="Internal error fetching all ServiceRequests")
 # if __name__ == '__main__':
 #     print("DEBUG: Iniciando servidor Uvicorn localmente (si se ejecuta directamente este archivo).") # Debug
 #     uvicorn.run(app, host="0.0.0.0", port=8000)

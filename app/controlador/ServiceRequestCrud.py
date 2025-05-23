@@ -71,3 +71,14 @@ def WriteServiceRequest(sr_dict: dict):
     except Exception as e:
         print(f"ERROR: Excepción durante la inserción en MongoDB: {e}") # Debug
         return "errorInserting: {str(e)}", None
+
+def GetAllServiceRequests():
+    try:
+        collection = connect_to_mongodb()
+        all_docs = list(collection.find({}))
+        for doc in all_docs:
+            doc["_id"] = str(doc["_id"])  # Convertir ObjectId a string
+        return "success", all_docs
+    except Exception as e:
+        print(f"Error al obtener todos los ServiceRequest: {e}")
+        return "error", []
