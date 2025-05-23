@@ -1,91 +1,151 @@
-from fastapi import FastAPI, HTTPException, Request
-import uvicorn
-# Importamos las funciones CRUD específicas para ServiceRequest
+# app.py del backend (Corregido)
+
+from fastapi import FastAPI, HTTPException, Request, status
+from fastapi.middleware.cors import CORSMiddleware
+from uvicorn import run as uvicorn_run # Renombrado para evitar conflictos
+
+# Importamos las funciones CRUD específicas para ServiceRequest.
+# Asumiendo que 'app.controlador' es la ruta correcta a tu ServiceRequestCrud.py
+# Si ServiceRequestCrud.py está directamente en la misma carpeta que app.py,
+# solo necesitarías: from ServiceRequestCrud import ...
 from app.controlador.ServiceRequestCrud import (
     GetServiceRequestById,
     GetServiceRequestByIdentifier,
     WriteServiceRequest,
     GetAllServiceRequests
 )
-from fastapi.middleware.cors import CORSMiddleware
-import json # Importar json para depuración si es necesario
+import json # Para pretty-print de JSON en logs
+import logging # Para un manejo de logs más profesional
 
-app = FastAPI()
+# Configuración básica de logging para FastAPI
+# Esto asegura que los mensajes de log de FastAPI y tu código se muestren en la consola.
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+app = FastAPI(
+    title="HIS Service Request API",
+    description="API para gestionar solicitudes de exámenes médicos (ServiceRequest) siguiendo estándares FHIR.",
+    version="1.0.0"
+)
 
 # Configuración de CORS (Cross-Origin Resource Sharing)
+# Esto es crucial para permitir que tu frontend (que corre en un origen diferente)
+# pueda comunicarse con tu backend.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # **ADVERTENCIA**: En producción, reemplaza "*" con el/los dominio(s) de tu frontend
-    allow_credentials=True,
-    allow_methods=["*"],  # Permitir todos los métodos (GET, POST, PUT, DELETE, etc.)
-    allow_headers=["*"],  # Permitir todos los encabezados
+                          # Ejemplo: ["http://localhost:5500", "https://tufrontend.com"]
+    allow_credentials=True, # Permitir cookies, cabeceras de autorización, etc.
+    allow_methods=["*"],    # Permitir todos los métodos (GET, POST, PUT, DELETE, OPTIONS)
+    allow_headers=["*"],    # Permitir todos los encabezados
 )
 
-# Ruta para obtener un ServiceRequest por ID
-@app.get("/servicerequest/{sr_id}", response_model=dict)
+# --- Rutas de la API para ServiceRequest ---
+
+# Ruta para obtener un ServiceRequest por ID de MongoDB
+@app.get("/servicerequest/{sr_id}", response_model=dict, summary="Obtener ServiceRequest por ID de MongoDB")
 async def get_service_request_by_id(sr_id: str):
-    print(f"DEBUG: GET /servicerequest/{sr_id} recibido.") # Debug
-    status, sr = GetServiceRequestById(sr_id)
-    if status == 'success':
-        return sr
-    elif status == 'notFound':
-        raise HTTPException(status_code=404, detail="ServiceRequest not found")
-    else:
-        raise HTTPException(status_code=500, detail=f"Internal error fetching ServiceRequest by ID: {status}")
-
-# Ruta para obtener un ServiceRequest por identificador de paciente
-@app.get("/servicerequest/", response_model=dict)
-async def get_service_request_by_identifier(system: str, value: str):
-    print(f"DEBUG: GET /servicerequest/ con system={system}, value={value} recibido.") # Debug
-    status, sr = GetServiceRequestByIdentifier(system, value)
-    if status == 'success':
-        return sr
-    elif status == 'notFound':
-        raise HTTPException(status_code=404, detail="ServiceRequest not found for provided identifier")
-    else:
-        raise HTTPException(status_code=500, detail=f"Internal error fetching ServiceRequest by identifier: {status}")
-
-# Ruta para agregar un nuevo ServiceRequest (POST)
-@app.post("/servicerequest", response_model=dict)
-async def add_service_request(request: Request):
-    print("DEBUG: POST /servicerequest recibido.") # Debug
-    try:
-        # Obtenemos el cuerpo de la solicitud como un diccionario JSON
-        new_sr_dict = dict(await request.json())
-        print(f"DEBUG: Cuerpo de la solicitud JSON recibido: {json.dumps(new_sr_dict, indent=2, ensure_ascii=False)}") # Debug
-
-        # Llamamos a la función del CRUD para escribir la solicitud de servicio en la base de datos
-        status, sr_id = WriteServiceRequest(new_sr_dict)
-
-        if status == 'success':
-            print(f"DEBUG: Solicitud de servicio guardada con éxito. ID: {sr_id}") # Debug
-            return {"_id": sr_id}
-        elif "errorValidating" in status:
-            print(f"ERROR: Fallo en la validación de ServiceRequest: {status}") # Debug
-            raise HTTPException(status_code=422, detail=f"Validation Error: {status}")
-        elif "errorInserting" in status:
-            print(f"ERROR: Fallo en la inserción de ServiceRequest en DB: {status}") # Debug
-            raise HTTPException(status_code=500, detail=f"Database Insertion Error: {status}")
-        else:
-            print(f"ERROR: Error interno desconocido al procesar ServiceRequest: {status}") # Debug
-            raise HTTPException(status_code=500, detail=f"Internal Server Error: {status}")
+    logging.info(f"GET /servicerequest/{sr_id} recibido.")
+    status_code, sr_data = GetServiceRequestById(sr_id) # sr_data es el dict del SR o None
     
-    except Exception as e:
-        print(f"ERROR: Excepción inesperada en add_service_request: {e}") # Debug
-        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
+    if status_code == 'success':
+        return sr_data
+    elif status_code == 'notFound':
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="ServiceRequest no encontrado con el ID proporcionado."
+        )
+    elif status_code == 'invalidId':
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El formato del ID de ServiceRequest proporcionado no es válido."
+        )
+    else: # Esto capturaría 'error' o cualquier otro estado inesperado
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error interno al obtener ServiceRequest por ID: {sr_data}" # sr_data aquí es el mensaje de error
+        )
 
-# Bloque para ejecutar la aplicación con Uvicorn si se ejecuta directamente este archivo
-# En un entorno de producción (como Render), esto es gestionado por el servidor de aplicaciones
-# (Gunicorn, por ejemplo), por lo que normalmente estaría comentado o ajustado.
+# Ruta para obtener un ServiceRequest por identificador de paciente (ej. número de documento)
+@app.get("/servicerequest/by-patient-identifier", response_model=dict, summary="Obtener ServiceRequest por identificador de paciente")
+async def get_service_request_by_identifier(system: str, value: str):
+    logging.info(f"GET /servicerequest/by-patient-identifier con system='{system}', value='{value}' recibido.")
+    status_code, sr_data = GetServiceRequestByIdentifier(system, value)
+    
+    if status_code == 'success':
+        return sr_data
+    elif status_code == 'notFound':
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="ServiceRequest no encontrado para el identificador de paciente proporcionado."
+        )
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error interno al obtener ServiceRequest por identificador de paciente: {sr_data}"
+        )
+
+# Ruta para crear un nuevo ServiceRequest (POST)
+@app.post("/servicerequest", response_model=dict, status_code=status.HTTP_201_CREATED, summary="Crear un nuevo ServiceRequest")
+async def add_service_request(request: Request):
+    logging.info("POST /servicerequest recibido.")
+    try:
+        # FastAPI ya parsea el JSON del cuerpo de la solicitud automáticamente.
+        # No necesitas await request.json() si usas Pydantic models directamente,
+        # pero para recibir un dict genérico, Request.json() es válido.
+        new_sr_dict = await request.json()
+        logging.debug(f"Cuerpo de la solicitud JSON recibido: {json.dumps(new_sr_dict, indent=2, ensure_ascii=False)}")
+
+        # Llamar a la función del CRUD para guardar el ServiceRequest
+        # `result_data` ahora contendrá el dict completo del SR insertado, incluyendo el _id de MongoDB.
+        status_code_crud, result_data = WriteServiceRequest(new_sr_dict)
+
+        if status_code_crud == 'success':
+            logging.info(f"Solicitud de servicio guardada con éxito. MongoDB ID: {result_data.get('_id', 'N/A')}")
+            # Devolver el dict completo insertado, que incluye el _id de MongoDB.
+            return result_data
+        elif "errorValidating" in status_code_crud:
+            logging.error(f"Fallo en la validación FHIR del ServiceRequest: {status_code_crud}")
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, # 422 para errores de validación de datos
+                detail=f"Error de validación de datos FHIR: {status_code_crud.split(':', 1)[1] if ':' in status_code_crud else status_code_crud}"
+            )
+        elif "errorInserting" in status_code_crud:
+            logging.error(f"Fallo en la inserción de ServiceRequest en MongoDB: {status_code_crud}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Error de inserción en la base de datos: {status_code_crud.split(':', 1)[1] if ':' in status_code_crud else status_code_crud}"
+            )
+        else: # Capturar cualquier otro estado inesperado del CRUD
+            logging.error(f"Error interno desconocido al procesar ServiceRequest: {status_code_crud}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Error interno del servidor: {status_code_crud}"
+            )
+    except Exception as e:
+        logging.error(f"Excepción inesperada en la ruta POST /servicerequest: {e}", exc_info=True) # exc_info para traceback
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error interno del servidor al procesar la solicitud: {str(e)}"
+        )
+
 # Ruta para obtener todos los ServiceRequest
-@app.get("/servicerequest/all", response_model=dict)
+@app.get("/servicerequest/all", response_model=dict, summary="Obtener todas las solicitudes de examen")
 async def get_all_service_requests():
-    print("DEBUG: GET /servicerequest/all recibido.")  # Debug
-    status, sr_list = GetAllServiceRequests()
-    if status == 'success':
+    logging.info("GET /servicerequest/all recibido.")
+    status_code, sr_list = GetAllServiceRequests()
+    
+    if status_code == 'success':
         return {"serviceRequests": sr_list}
     else:
-        raise HTTPException(status_code=500, detail="Internal error fetching all ServiceRequests")
-# if __name__ == '__main__':
-#     print("DEBUG: Iniciando servidor Uvicorn localmente (si se ejecuta directamente este archivo).") # Debug
-#     uvicorn.run(app, host="0.0.0.0", port=8000)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error interno al obtener todas las solicitudes de servicio: {sr_list}" # sr_list aquí es el mensaje de error
+        )
+
+# Bloque para ejecutar la aplicación con Uvicorn localmente
+# Esto se activará cuando ejecutes 'python app.py' directamente.
+# En un entorno de producción (como Render), el servidor de aplicaciones (Gunicorn)
+# es quien llama a la aplicación FastAPI.
+if __name__ == '__main__':
+    logging.info("Iniciando servidor Uvicorn localmente en http://0.0.0.0:8000")
+    uvicorn_run(app, host="0.0.0.0", port=8000)
